@@ -7,6 +7,7 @@ const dropZone = document.getElementById('dropZone');
 const statusMessage = document.getElementById('statusMessage');
 const generateBtn = document.getElementById('generateBtn');
 const downloadBtn = document.getElementById('downloadBtn');
+const shareBtn = document.getElementById('shareBtn');
 const printBtn = document.getElementById('printBtn');
 const cameraBtn = document.getElementById('cameraBtn');
 const cameraWrap = document.getElementById('cameraWrap');
@@ -19,13 +20,7 @@ const lineWidthInput = document.getElementById('lineWidth');
 const brightnessInput = document.getElementById('brightness');
 const saturationInput = document.getElementById('saturation');
 
-const state = {
-  image: null,
-  stream: null,
-  hasResult: false,
-  rotation: 0,
-  flipX: false,
-};
+const state = { image: null, stream: null, hasResult: false, rotation: 0, flipX: false };
 
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
@@ -102,7 +97,7 @@ function captureFromCamera() {
     resetTransforms(false);
     stopCamera();
     generateColoringPage();
-    setStatus('Foto aufgenommen. Bearbeite es nach Wunsch und drucke danach dein Ausmalbild.');
+    setStatus('Foto aufgenommen. Bearbeite es nach Wunsch und drucke oder teile danach dein Ausmalbild.');
   };
   image.src = canvas.toDataURL('image/png');
 }
@@ -146,7 +141,6 @@ function createEdgeMap(source) {
     const index = i * 4;
     gray[i] = 0.299 * sourceData[index] + 0.587 * sourceData[index + 1] + 0.114 * sourceData[index + 2];
   }
-
   const contrast = Number(contrastInput.value);
   const threshold = Number(thresholdInput.value);
   const pixels = new Uint8ClampedArray(width * height * 4);
@@ -204,6 +198,52 @@ function generateColoringPage() {
   const editedPhoto = createEditedPhoto();
   updateSourcePreview(editedPhoto);
   renderLineDrawing(createEdgeMap(editedPhoto));
+}
+
+function getColoringPageFile() {
+  return new Promise((resolve, reject) => {
+    outputCanvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('Das Ausmalbild konnte nicht erstellt werden.'));
+        return;
+      }
+      resolve(new File([blob], 'ausmalbild.png', { type: 'image/png' }));
+    }, 'image/png');
+  });
+}
+
+async function shareColoringPage() {
+  if (!state.hasResult) {
+    setStatus('Lade zuerst ein Foto hoch, bevor du es teilst.', true);
+    return;
+  }
+
+  try {
+    const file = await getColoringPageFile();
+    if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+      await navigator.share({
+        title: 'Mein Ausmalbild',
+        text: 'Schau dir mein Ausmalbild an!',
+        files: [file],
+      });
+      setStatus('Ausmalbild wurde zum Teilen freigegeben.');
+      return;
+    }
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(file);
+    link.download = file.name;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    setStatus('Teilen wird von diesem Browser nicht unterstützt. Das Ausmalbild wurde heruntergeladen – du kannst es jetzt als Anhang verschicken.');
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      setStatus('Teilen abgebrochen.');
+      return;
+    }
+    console.error(error);
+    setStatus('Das Ausmalbild konnte nicht geteilt werden. Bitte speichere es als PNG und verschicke die Datei.', true);
+  }
 }
 
 function printColoringPage() {
@@ -264,6 +304,7 @@ downloadBtn.addEventListener('click', () => {
   link.download = 'ausmalbild.png';
   link.click();
 });
+shareBtn.addEventListener('click', shareColoringPage);
 printBtn.addEventListener('click', printColoringPage);
 
 function drawPlaceholder() {
