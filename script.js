@@ -1,5 +1,7 @@
 const outputCanvas = document.getElementById('outputCanvas');
 const outputCtx = outputCanvas.getContext('2d');
+const sourceCanvas = document.getElementById('sourceCanvas');
+const sourceCtx = sourceCanvas.getContext('2d');
 const photoInput = document.getElementById('photoInput');
 const dropZone = document.getElementById('dropZone');
 const statusMessage = document.getElementById('statusMessage');
@@ -14,12 +16,16 @@ const closeCameraBtn = document.getElementById('closeCameraBtn');
 const contrastInput = document.getElementById('contrast');
 const thresholdInput = document.getElementById('threshold');
 const lineWidthInput = document.getElementById('lineWidth');
+const brightnessInput = document.getElementById('brightness');
+const saturationInput = document.getElementById('saturation');
 
-const state = { image: null, stream: null, hasResult: false };
-
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
+const state = {
+  image: null,
+  stream: null,
+  hasResult: false,
+  rotation: 0,
+  flipX: false,
+};
 
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
@@ -32,20 +38,31 @@ function loadImageFromFile(file) {
     setStatus('Bitte wähle eine Bilddatei aus (zum Beispiel JPG oder PNG).', true);
     return;
   }
-
   const objectUrl = URL.createObjectURL(file);
   const image = new Image();
   image.onload = () => {
     URL.revokeObjectURL(objectUrl);
     state.image = image;
+    resetTransforms(false);
     generateColoringPage();
-    setStatus(`Foto „${file.name}“ wurde geladen und umgewandelt.`);
+    setStatus(`Foto „${file.name || 'Kamerafoto'}“ ist bereit. Du kannst es jetzt bearbeiten.`);
   };
   image.onerror = () => {
     URL.revokeObjectURL(objectUrl);
     setStatus('Dieses Foto konnte nicht geöffnet werden. Bitte probiere ein anderes Bild.', true);
   };
   image.src = objectUrl;
+}
+
+function resetTransforms(render = true) {
+  state.rotation = 0;
+  state.flipX = false;
+  brightnessInput.value = '100';
+  saturationInput.value = '100';
+  document.getElementById('brightnessValue').value = '100%';
+  document.getElementById('saturationValue').value = '100%';
+  document.getElementById('flipBtn').setAttribute('aria-pressed', 'false');
+  if (render && state.image) generateColoringPage();
 }
 
 function stopCamera() {
@@ -75,84 +92,106 @@ async function openCamera() {
 
 function captureFromCamera() {
   if (!camera.videoWidth || !camera.videoHeight) return;
-  const captureCanvas = document.createElement('canvas');
-  captureCanvas.width = camera.videoWidth;
-  captureCanvas.height = camera.videoHeight;
-  captureCanvas.getContext('2d').drawImage(camera, 0, 0);
+  const canvas = document.createElement('canvas');
+  canvas.width = camera.videoWidth;
+  canvas.height = camera.videoHeight;
+  canvas.getContext('2d').drawImage(camera, 0, 0);
   const image = new Image();
   image.onload = () => {
     state.image = image;
+    resetTransforms(false);
     stopCamera();
     generateColoringPage();
-    setStatus('Foto aufgenommen und als Ausmalbild umgewandelt.');
+    setStatus('Foto aufgenommen. Bearbeite es nach Wunsch und drucke danach dein Ausmalbild.');
   };
-  image.src = captureCanvas.toDataURL('image/png');
+  image.src = canvas.toDataURL('image/png');
 }
 
-function createEdgeMap(sourceCanvas) {
-  const { width, height } = sourceCanvas;
-  const sourceData = sourceCanvas.getContext('2d').getImageData(0, 0, width, height).data;
+function createEditedPhoto() {
+  if (!state.image) return null;
+  const maxDimension = 1400;
+  const scale = Math.min(maxDimension / state.image.width, maxDimension / state.image.height, 1);
+  const originalWidth = Math.max(1, Math.round(state.image.width * scale));
+  const originalHeight = Math.max(1, Math.round(state.image.height * scale));
+  const sideways = Math.abs(state.rotation % 180) === 90;
+  const width = sideways ? originalHeight : originalWidth;
+  const height = sideways ? originalWidth : originalHeight;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.translate(width / 2, height / 2);
+  ctx.rotate((state.rotation * Math.PI) / 180);
+  ctx.scale(state.flipX ? -1 : 1, 1);
+  ctx.filter = `brightness(${brightnessInput.value}%) saturate(${saturationInput.value}%)`;
+  ctx.drawImage(state.image, -originalWidth / 2, -originalHeight / 2, originalWidth, originalHeight);
+  ctx.restore();
+  return canvas;
+}
+
+function updateSourcePreview(editedCanvas) {
+  document.getElementById('sourcePlaceholder').hidden = true;
+  sourceCanvas.width = editedCanvas.width;
+  sourceCanvas.height = editedCanvas.height;
+  sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+  sourceCtx.drawImage(editedCanvas, 0, 0);
+}
+
+function createEdgeMap(source) {
+  const { width, height } = source;
+  const sourceData = source.getContext('2d').getImageData(0, 0, width, height).data;
   const gray = new Float32Array(width * height);
   for (let i = 0; i < width * height; i += 1) {
     const index = i * 4;
     gray[i] = 0.299 * sourceData[index] + 0.587 * sourceData[index + 1] + 0.114 * sourceData[index + 2];
   }
 
-  const contrastValue = Number(contrastInput.value);
-  const thresholdValue = Number(thresholdInput.value);
-  const result = new Uint8ClampedArray(width * height * 4);
+  const contrast = Number(contrastInput.value);
+  const threshold = Number(thresholdInput.value);
+  const pixels = new Uint8ClampedArray(width * height * 4);
   for (let y = 1; y < height - 1; y += 1) {
     for (let x = 1; x < width - 1; x += 1) {
-      const tl = gray[(y - 1) * width + (x - 1)];
+      const tl = gray[(y - 1) * width + x - 1];
       const t = gray[(y - 1) * width + x];
-      const tr = gray[(y - 1) * width + (x + 1)];
-      const l = gray[y * width + (x - 1)];
-      const r = gray[y * width + (x + 1)];
-      const bl = gray[(y + 1) * width + (x - 1)];
+      const tr = gray[(y - 1) * width + x + 1];
+      const l = gray[y * width + x - 1];
+      const r = gray[y * width + x + 1];
+      const bl = gray[(y + 1) * width + x - 1];
       const b = gray[(y + 1) * width + x];
-      const br = gray[(y + 1) * width + (x + 1)];
-      const gx = -tl - (2 * l) - bl + tr + (2 * r) + br;
-      const gy = -tl - (2 * t) - tr + bl + (2 * b) + br;
-      const magnitude = Math.sqrt(gx * gx + gy * gy);
-      const value = (magnitude * contrastValue) / 100 > thresholdValue ? 0 : 255;
-      const resultIndex = (y * width + x) * 4;
-      result[resultIndex] = value;
-      result[resultIndex + 1] = value;
-      result[resultIndex + 2] = value;
-      result[resultIndex + 3] = 255;
+      const br = gray[(y + 1) * width + x + 1];
+      const gx = -tl - 2 * l - bl + tr + 2 * r + br;
+      const gy = -tl - 2 * t - tr + bl + 2 * b + br;
+      const value = (Math.hypot(gx, gy) * contrast) / 100 > threshold ? 0 : 255;
+      const index = (y * width + x) * 4;
+      pixels[index] = pixels[index + 1] = pixels[index + 2] = value;
+      pixels[index + 3] = 255;
     }
   }
-  return new ImageData(result, width, height);
+  return new ImageData(pixels, width, height);
 }
 
 function renderLineDrawing(edgeImage) {
-  const width = edgeImage.width;
-  const height = edgeImage.height;
+  const { width, height, data } = edgeImage;
   const lineWidth = Number(lineWidthInput.value);
-  outputCanvas.width = width;
-  outputCanvas.height = height;
-
-  // Turn the detected edges into clean, continuous black lines on white paper.
-  const pixels = edgeImage.data;
   if (lineWidth > 1) {
-    const source = new Uint8ClampedArray(pixels);
-    const radius = Math.max(0, Math.round((lineWidth - 1) * 1.5));
+    const original = new Uint8ClampedArray(data);
+    const radius = Math.max(1, Math.round((lineWidth - 1) * 1.5));
     for (let y = 1; y < height - 1; y += 1) {
       for (let x = 1; x < width - 1; x += 1) {
-        const index = (y * width + x) * 4;
-        let isEdge = source[index] < 128;
+        let isEdge = false;
         for (let dy = -radius; !isEdge && dy <= radius; dy += 1) {
           for (let dx = -radius; dx <= radius; dx += 1) {
-            if (source[((y + dy) * width + x + dx) * 4] < 128) { isEdge = true; break; }
+            if (original[((y + dy) * width + x + dx) * 4] < 128) { isEdge = true; break; }
           }
         }
-        const value = isEdge ? 0 : 255;
-        pixels[index] = value;
-        pixels[index + 1] = value;
-        pixels[index + 2] = value;
+        const index = (y * width + x) * 4;
+        data[index] = data[index + 1] = data[index + 2] = isEdge ? 0 : 255;
       }
     }
   }
+  outputCanvas.width = width;
+  outputCanvas.height = height;
   outputCtx.putImageData(edgeImage, 0, 0);
   state.hasResult = true;
 }
@@ -162,15 +201,9 @@ function generateColoringPage() {
     setStatus('Lade zuerst ein Foto hoch oder nimm eines mit der Kamera auf.', true);
     return;
   }
-  const maxDimension = 1400;
-  const ratio = Math.min(maxDimension / state.image.width, maxDimension / state.image.height, 1);
-  const width = Math.max(1, Math.round(state.image.width * ratio));
-  const height = Math.max(1, Math.round(state.image.height * ratio));
-  const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = width;
-  tempCanvas.height = height;
-  tempCanvas.getContext('2d').drawImage(state.image, 0, 0, width, height);
-  renderLineDrawing(createEdgeMap(tempCanvas));
+  const editedPhoto = createEditedPhoto();
+  updateSourcePreview(editedPhoto);
+  renderLineDrawing(createEdgeMap(editedPhoto));
 }
 
 function printColoringPage() {
@@ -185,13 +218,7 @@ function printColoringPage() {
   }
   const imageUrl = outputCanvas.toDataURL('image/png');
   printWindow.document.open();
-  printWindow.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Ausmalbild drucken</title><style>
-    @page { size: A4; margin: 12mm; }
-    html, body { width: 100%; height: 100%; margin: 0; }
-    body { display: grid; place-items: center; background: white; }
-    img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
-    @media screen { body { min-height: 100vh; padding: 12px; box-sizing: border-box; } img { max-height: calc(100vh - 24px); } }
-  </style></head><body><img src="${imageUrl}" alt="Ausmalbild"><script>window.onload = () => setTimeout(() => { window.focus(); window.print(); }, 250);<\/script></body></html>`);
+  printWindow.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Ausmalbild drucken</title><style>@page{size:A4;margin:12mm}html,body{width:100%;height:100%;margin:0}body{display:grid;place-items:center;background:white}img{display:block;max-width:100%;max-height:100%;object-fit:contain}@media screen{body{min-height:100vh;padding:12px;box-sizing:border-box}img{max-height:calc(100vh - 24px)}}</style></head><body><img src="${imageUrl}" alt="Ausmalbild"><script>window.onload=()=>setTimeout(()=>{window.focus();window.print()},250);<\/script></body></html>`);
   printWindow.document.close();
 }
 
@@ -200,11 +227,11 @@ photoInput.addEventListener('change', (event) => {
   loadImageFromFile(event.target.files[0]);
   event.target.value = '';
 });
-['dragenter', 'dragover'].forEach((eventName) => dropZone.addEventListener(eventName, (event) => {
+['dragenter', 'dragover'].forEach((name) => dropZone.addEventListener(name, (event) => {
   event.preventDefault();
   dropZone.classList.add('is-dragging');
 }));
-['dragleave', 'drop'].forEach((eventName) => dropZone.addEventListener(eventName, (event) => {
+['dragleave', 'drop'].forEach((name) => dropZone.addEventListener(name, (event) => {
   event.preventDefault();
   dropZone.classList.remove('is-dragging');
 }));
@@ -213,14 +240,25 @@ cameraBtn.addEventListener('click', openCamera);
 closeCameraBtn.addEventListener('click', stopCamera);
 captureBtn.addEventListener('click', captureFromCamera);
 generateBtn.addEventListener('click', generateColoringPage);
-contrastInput.addEventListener('input', generateColoringPage);
-thresholdInput.addEventListener('input', generateColoringPage);
-lineWidthInput.addEventListener('input', generateColoringPage);
+document.getElementById('rotateLeftBtn').addEventListener('click', () => { state.rotation = (state.rotation + 270) % 360; generateColoringPage(); });
+document.getElementById('rotateRightBtn').addEventListener('click', () => { state.rotation = (state.rotation + 90) % 360; generateColoringPage(); });
+document.getElementById('flipBtn').addEventListener('click', (event) => {
+  state.flipX = !state.flipX;
+  event.currentTarget.setAttribute('aria-pressed', String(state.flipX));
+  generateColoringPage();
+});
+document.getElementById('resetEditBtn').addEventListener('click', () => resetTransforms());
+brightnessInput.addEventListener('input', () => {
+  document.getElementById('brightnessValue').value = `${brightnessInput.value}%`;
+  generateColoringPage();
+});
+saturationInput.addEventListener('input', () => {
+  document.getElementById('saturationValue').value = `${saturationInput.value}%`;
+  generateColoringPage();
+});
+[contrastInput, thresholdInput, lineWidthInput].forEach((input) => input.addEventListener('input', generateColoringPage));
 downloadBtn.addEventListener('click', () => {
-  if (!state.hasResult) {
-    setStatus('Lade zuerst ein Foto hoch, bevor du es speicherst.', true);
-    return;
-  }
+  if (!state.hasResult) { setStatus('Lade zuerst ein Foto hoch, bevor du es speicherst.', true); return; }
   const link = document.createElement('a');
   link.href = outputCanvas.toDataURL('image/png');
   link.download = 'ausmalbild.png';

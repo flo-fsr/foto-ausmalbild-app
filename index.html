@@ -13,16 +13,13 @@
         <div>
           <p class="eyebrow">Dein Foto wird zum Ausmalbild</p>
           <h1>Foto-Ausmalbild</h1>
-          <p class="intro">Lade ein bereits aufgenommenes Foto hoch oder fotografiere direkt. Dein Bild wird im Browser umgewandelt und kann anschließend ausgedruckt werden.</p>
+          <p class="intro">Lade ein bereits aufgenommenes Foto hoch oder fotografiere direkt. Bearbeite dein Bild und wandle es danach in ein druckbares Ausmalbild um.</p>
         </div>
       </header>
 
       <main class="app-layout">
         <section class="panel controls-panel" aria-labelledby="choose-heading">
-          <div class="section-header">
-            <h2 id="choose-heading">1. Foto auswählen</h2>
-          </div>
-
+          <div class="section-header"><h2 id="choose-heading">1. Foto auswählen</h2></div>
           <input id="photoInput" type="file" accept="image/*" capture="environment" hidden />
           <div class="drop-zone" id="dropZone" role="region" aria-label="Foto hochladen">
             <span class="upload-icon" aria-hidden="true">↑</span>
@@ -31,9 +28,7 @@
             <button class="btn primary" id="choosePhotoBtn" type="button">Foto auswählen</button>
             <p class="file-note">JPG, PNG, GIF oder WebP · Das Foto bleibt auf deinem Gerät</p>
           </div>
-          <div class="upload-row">
-            <button class="btn secondary" id="cameraBtn" type="button">Kamera öffnen</button>
-          </div>
+          <div class="upload-row"><button class="btn secondary" id="cameraBtn" type="button">Kamera öffnen</button></div>
           <p id="statusMessage" class="status-message" role="status" aria-live="polite">Wähle ein Foto aus, um loszulegen.</p>
 
           <div id="cameraWrap" class="camera-panel hidden">
@@ -44,21 +39,24 @@
             </div>
           </div>
 
-          <div class="settings-block">
-            <h3>Einstellungen</h3>
-            <label>
-              Kontrast
-              <input id="contrast" type="range" min="80" max="220" value="150" />
-            </label>
-            <label>
-              Detailstärke
-              <input id="threshold" type="range" min="20" max="180" value="96" />
-            </label>
-            <label>
-              Linienbreite
-              <input id="lineWidth" type="range" min="0.6" max="2.5" step="0.1" value="1.2" />
-            </label>
-          </div>
+          <section class="edit-block" aria-labelledby="edit-heading">
+            <div class="settings-title"><h3 id="edit-heading">2. Foto bearbeiten</h3><button class="text-button" id="resetEditBtn" type="button">Zurücksetzen</button></div>
+            <div class="source-preview"><canvas id="sourceCanvas" width="1" height="1" aria-label="Vorschau des bearbeiteten Fotos"></canvas><span id="sourcePlaceholder">Dein Foto erscheint hier</span></div>
+            <div class="edit-buttons">
+              <button class="btn small" id="rotateLeftBtn" type="button" aria-label="90 Grad nach links drehen">↶ Drehen</button>
+              <button class="btn small" id="rotateRightBtn" type="button" aria-label="90 Grad nach rechts drehen">↷ Drehen</button>
+              <button class="btn small" id="flipBtn" type="button" aria-pressed="false">↔ Spiegeln</button>
+            </div>
+            <label class="range-label">Helligkeit <output id="brightnessValue">100%</output><input id="brightness" type="range" min="50" max="150" value="100" /></label>
+            <label class="range-label">Farbsättigung <output id="saturationValue">100%</output><input id="saturation" type="range" min="0" max="200" value="100" /></label>
+          </section>
+
+          <section class="settings-block" aria-labelledby="settings-heading">
+            <h3 id="settings-heading">3. Ausmalbild anpassen</h3>
+            <label>Kontrast<input id="contrast" type="range" min="80" max="220" value="150" /></label>
+            <label>Detailstärke<input id="threshold" type="range" min="20" max="180" value="96" /></label>
+            <label>Linienbreite<input id="lineWidth" type="range" min="0.6" max="2.5" step="0.1" value="1.2" /></label>
+          </section>
 
           <div class="action-row">
             <button class="btn accent" id="generateBtn" type="button">Ausmalbild erzeugen</button>
@@ -68,17 +66,12 @@
         </section>
 
         <section class="panel preview-panel" aria-labelledby="preview-heading">
-          <div class="section-header">
-            <h2 id="preview-heading">2. Vorschau &amp; Druck</h2>
-          </div>
-          <div class="canvas-wrap">
-            <canvas id="outputCanvas" width="900" height="900" aria-label="Vorschau des Ausmalbilds"></canvas>
-          </div>
-          <p class="helper-text">Wenn dir das Ergebnis gefällt, klicke auf „Ausmalbild drucken“ oder speichere es als PNG. Beim Drucken wird das Bild automatisch auf eine A4-Seite angepasst.</p>
+          <div class="section-header"><h2 id="preview-heading">4. Ausmalbild &amp; Druck</h2></div>
+          <div class="canvas-wrap"><canvas id="outputCanvas" width="900" height="900" aria-label="Vorschau des Ausmalbilds"></canvas></div>
+          <p class="helper-text">Die Änderungen am Foto werden direkt übernommen. Wenn dir das Ausmalbild gefällt, speichere es als PNG oder drucke es auf A4. Dein Foto wird nur auf deinem Gerät verarbeitet.</p>
         </section>
       </main>
     </div>
-
     <script src="script.js"></script>
   </body>
 </html>
