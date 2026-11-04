@@ -1,30 +1,19 @@
-# Foto-Ausmalbild App
+# Foto-Ausmalbild
 
-Eine einfache Web-App zum Fotografieren oder Hochladen eines Motivs und danach als druckbares Ausmalbild zu erzeugen.
+Eine einfache Web-App, die Fotos direkt im Browser in druckbare Ausmalbilder umwandelt.
 
 ## Funktionen
 
-- Foto aufnehmen oder aus Datei laden
-- Bild automatisch in eine schwarze Kontur-Linie umwandeln
-- Vorschau als fertiges Ausmalblatt
-- PNG exportieren
-- Drucken
+- Bereits aufgenommene Fotos vom Gerät auswählen oder per Drag-and-drop in die App ziehen
+- Neues Foto mit der Kamera aufnehmen
+- Kontrast, Detailstärke und Linienbreite anpassen
+- Das fertige Ausmalbild als PNG speichern oder auf A4 drucken
+- Die Fotos werden lokal im Browser verarbeitet und nicht hochgeladen
 
-## Lokaler Start
-
-1. In das Projektverzeichnis wechseln
-2. Einen lokalen Webserver starten:
+## Lokal starten
 
 ```bash
 python3 -m http.server 3000
 ```
 
-3. Browser öffnen:
-
-```text
-http://localhost:3000
-```
-
-## Hinweis
-
-Für die Kamera-Funktion muss die Seite lokal oder über HTTPS geladen werden.
+Öffne anschließend `http://localhost:3000` im Browser. Für die Kamera-Funktion muss die Seite über `localhost` oder HTTPS geladen werden. Der Foto-Upload funktioniert auch ohne Kamerazugriff.

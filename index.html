@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f3efe8" />
     <title>Foto-Ausmalbild</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -10,22 +11,30 @@
     <div class="page-shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Kreative Bildverarbeitung</p>
+          <p class="eyebrow">Dein Foto wird zum Ausmalbild</p>
           <h1>Foto-Ausmalbild</h1>
+          <p class="intro">Lade ein bereits aufgenommenes Foto hoch oder fotografiere direkt. Dein Bild wird im Browser umgewandelt und kann anschließend ausgedruckt werden.</p>
         </div>
       </header>
 
       <main class="app-layout">
-        <section class="panel controls-panel">
+        <section class="panel controls-panel" aria-labelledby="choose-heading">
           <div class="section-header">
-            <h2>1. Bild wählen</h2>
+            <h2 id="choose-heading">1. Foto auswählen</h2>
           </div>
 
+          <input id="photoInput" type="file" accept="image/*" capture="environment" hidden />
+          <div class="drop-zone" id="dropZone" role="region" aria-label="Foto hochladen">
+            <span class="upload-icon" aria-hidden="true">↑</span>
+            <p class="drop-title">Foto hier ablegen</p>
+            <p class="drop-copy">oder ein Bild von deinem Gerät auswählen</p>
+            <button class="btn primary" id="choosePhotoBtn" type="button">Foto auswählen</button>
+            <p class="file-note">JPG, PNG, GIF oder WebP · Das Foto bleibt auf deinem Gerät</p>
+          </div>
           <div class="upload-row">
-            <label class="btn primary" for="photoInput">Foto hochladen</label>
             <button class="btn secondary" id="cameraBtn" type="button">Kamera öffnen</button>
           </div>
-          <input id="photoInput" type="file" accept="image/*" capture="environment" hidden />
+          <p id="statusMessage" class="status-message" role="status" aria-live="polite">Wähle ein Foto aus, um loszulegen.</p>
 
           <div id="cameraWrap" class="camera-panel hidden">
             <video id="camera" autoplay playsinline muted></video>
@@ -54,18 +63,18 @@
           <div class="action-row">
             <button class="btn accent" id="generateBtn" type="button">Ausmalbild erzeugen</button>
             <button class="btn" id="downloadBtn" type="button">PNG speichern</button>
-            <button class="btn" id="printBtn" type="button">Drucken</button>
+            <button class="btn" id="printBtn" type="button">Ausmalbild drucken</button>
           </div>
         </section>
 
-        <section class="panel preview-panel">
+        <section class="panel preview-panel" aria-labelledby="preview-heading">
           <div class="section-header">
-            <h2>2. Vorschau</h2>
+            <h2 id="preview-heading">2. Vorschau &amp; Druck</h2>
           </div>
           <div class="canvas-wrap">
-            <canvas id="outputCanvas" width="900" height="900"></canvas>
+            <canvas id="outputCanvas" width="900" height="900" aria-label="Vorschau des Ausmalbilds"></canvas>
           </div>
-          <p class="helper-text">Die Ausgabe wird als schwarze Linien auf weißem Hintergrund erstellt – ideal zum Ausmalen oder Drucken.</p>
+          <p class="helper-text">Wenn dir das Ergebnis gefällt, klicke auf „Ausmalbild drucken“ oder speichere es als PNG. Beim Drucken wird das Bild automatisch auf eine A4-Seite angepasst.</p>
         </section>
       </main>
     </div>
